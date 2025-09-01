@@ -870,13 +870,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const blob = await pdfRes.blob();
-            zip.file(`Opt-Out Receipt ${ep}.pdf`, blob);
+            zip.file(`Opt-Out Request Acknowledgement ${ep}.pdf`, blob);
         }
 
         const content = await zip.generateAsync({ type: 'blob' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(content);
-        link.download = 'upc_receipts.zip';
+        link.download = 'UPC Opt-Out Request Acknowledgements.zip';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

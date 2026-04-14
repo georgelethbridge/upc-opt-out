@@ -1,10 +1,12 @@
 // script.js
 
+const BACKEND_URL = 'https://api-ipb9.onrender.com/upc';
+
 window.onSignIn = async function (response) {
   try {
     const token = response.credential;
 
-    const res = await fetch('https://upc-optout-backend.onrender.com/auth', {
+    const res = await fetch('${BACKEND_URL}/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token })
@@ -321,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spinner.style.display = 'block';
 
       try {
-        const addrRes = await fetch('https://upc-optout-backend.onrender.com/parse-address', {
+        const addrRes = await fetch('${BACKEND_URL}/parse-address', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: addressFull, name })
@@ -512,7 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Optional token fetch (just for console visibility / debug)
       try {
-        const tokenRes = await fetch('https://upc-optout-backend.onrender.com/token', {
+        const tokenRes = await fetch('${BACKEND_URL}/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initials })
@@ -573,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log(`📦 Final JSON sent to backend for EP ${ep}:`, finalJsonPreview);
 
-        const res = await fetch('https://upc-optout-backend.onrender.com/submit', {
+        const res = await fetch('${BACKEND_URL}/submit', {
           method: 'POST',
           body: formData
         });
@@ -796,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
     //   try {
     //     if (!tokenData.access_token) throw new Error(tokenData.error || 'Missing access_token');
 
-    //     const pdfRes = await fetch(`https://upc-optout-backend.onrender.com/receipt?initials=${initials}&requestId=${requestId}&ep=${encodeURIComponent(ep)}`);
+    //     const pdfRes = await fetch(`${BACKEND_URL}/receipt?initials=${initials}&requestId=${requestId}&ep=${encodeURIComponent(ep)}`);
 
     //     if (!pdfRes.ok) throw new Error('Receipt download failed');
 
@@ -847,7 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spinner.style.display = 'block';
 
       try {
-        const tokenRes = await fetch('https://upc-optout-backend.onrender.com/token', {
+        const tokenRes = await fetch('${BACKEND_URL}/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initials })
@@ -862,7 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const requestId = row.querySelector('td:nth-child(4)')?.textContent?.trim();
             if (!ep || !requestId || requestId === '—') continue;
 
-            const pdfRes = await fetch(`https://upc-optout-backend.onrender.com/receipt?initials=${initials}&requestId=${requestId}&ep=${encodeURIComponent(ep)}`);
+            const pdfRes = await fetch(`${BACKEND_URL}/receipt?initials=${initials}&requestId=${requestId}&ep=${encodeURIComponent(ep)}`);
 
             if (!pdfRes.ok) {
               console.warn(`Skipping ${ep}: receipt not found`);
@@ -890,7 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  fetch('https://upc-optout-backend.onrender.com/mode')
+  fetch('${BACKEND_URL}/mode')
     .then(res => res.json())
     .then(data => {
       const box = document.getElementById('mode-indicator');

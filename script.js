@@ -6,7 +6,7 @@ window.onSignIn = async function (response) {
   try {
     const token = response.credential;
 
-    const res = await fetch('${BACKEND_URL}/auth', {
+    const res = await fetch(`${BACKEND_URL}/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token })
@@ -323,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spinner.style.display = 'block';
 
       try {
-        const addrRes = await fetch('${BACKEND_URL}/parse-address', {
+        const addrRes = await fetch(`${BACKEND_URL}/parse-address`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ address: addressFull, name })
@@ -514,7 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Optional token fetch (just for console visibility / debug)
       try {
-        const tokenRes = await fetch('${BACKEND_URL}/token', {
+        const tokenRes = await fetch(`${BACKEND_URL}/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initials })
@@ -575,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log(`📦 Final JSON sent to backend for EP ${ep}:`, finalJsonPreview);
 
-        const res = await fetch('${BACKEND_URL}/submit', {
+        const res = await fetch(`${BACKEND_URL}/submit`, {
           method: 'POST',
           body: formData
         });
@@ -849,7 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spinner.style.display = 'block';
 
       try {
-        const tokenRes = await fetch('${BACKEND_URL}/token', {
+        const tokenRes = await fetch(`${BACKEND_URL}/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initials })
@@ -892,13 +892,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  fetch('${BACKEND_URL}/mode')
-    .then(res => res.json())
+  fetch(`${BACKEND_URL}/mode`)
+    .then(async res => {
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Mode request failed: ${res.status} ${res.statusText}. Response: ${text.slice(0, 200)}`);
+      }
+      return res.json();
+    })
     .then(data => {
       const box = document.getElementById('mode-indicator');
       box.textContent = `${data.emoji} ${data.mode}`;
-      box.style.background = data.mode === 'LIVE' ? '#d1fae5' : '#fef3c7';  // green or amber
+      box.style.background = data.mode === 'LIVE' ? '#d1fae5' : '#fef3c7';
       box.style.border = data.mode === 'LIVE' ? '2px solid #10b981' : '2px dashed #f59e0b';
+    })
+    .catch(err => {
+      console.error('Failed to load mode:', err);
     });
 
 

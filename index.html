@@ -112,9 +112,9 @@
             <label>Applicant Info (from spreadsheet):</label>
             <div id="spinner" style="display: none;">🔄 Parsing address via GPT...</div>
             <div id="applicant-summary" class="applicant-summary"></div>
-            <button id="edit-applicant">Edit</button>
 
             <div id="applicant-edit-form" style="display:none; margin-top:1rem;">
+              <div id="edit-form-title" style="font-weight: bold; margin-bottom: 0.5rem;"></div>
               <label>Applicant Type:
                 <select id="edit-applicant-type">
                   <option value="true">Natural Person</option>
@@ -132,6 +132,7 @@
               </div>
               <label>Email: <input type="text" id="edit-email" /></label><br />
               <button id="save-applicant">Save</button>
+              <button id="cancel-applicant" type="button">Cancel</button>
             </div>
           </section>
         </div>

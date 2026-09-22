@@ -130,13 +130,59 @@ textarea:focus {
 
 /* Applicant Summary */
 .applicant-summary {
-  background: #eaf4ff;
-  padding: 1rem;
-  border-radius: 6px;
   margin-top: 1rem;
   font-family: sans-serif;
   line-height: 1.5;
   font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.applicant-group {
+  background: #eaf4ff;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #c8e0f8;
+}
+
+.applicant-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.applicant-group-count {
+  background: #d3e8fd;
+  color: #1d4e89;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.applicant-group-header .edit-group-btn {
+  margin-left: auto;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.applicant-group-eps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.ep-chip {
+  background: #fff;
+  border: 1px solid #b7d4f0;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8rem;
+  font-family: monospace;
 }
 
 /* Copy button in JSON */

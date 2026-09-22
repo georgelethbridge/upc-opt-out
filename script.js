@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let extractedEPs = [];
   let applicationPDF = null;
   let mandatePDF = null;
-  let applicantInfo = {};
+  let applicantGroups = []; // [{ applicant, eps: ['EP...', ...] }] — one entry per unique owner details
   let applicationPdfBase64 = "";
   let mandatePdfBase64 = "";
 
@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const mandatePdfBase64Display = document.getElementById('mandate-pdf-base64');
   const requestBodyDisplay = document.getElementById('request-json');
   const copyRequestJsonButton = document.getElementById('copy-request-json');
-  const editBtn = document.getElementById('edit-applicant');
   const saveBtn = document.getElementById('save-applicant');
   const editForm = document.getElementById('applicant-edit-form');
   const spinner = document.getElementById('spinner');
@@ -98,9 +97,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function enableSubmitIfReady() {
     const initials = document.getElementById('initials').value.trim();
-    if (applicationPDF && initials && applicantInfo.name && extractedEPs.length) {
+    const applicantsReady = applicantGroups.length > 0 && applicantGroups.every(g => g.applicant?.name);
+    if (applicationPDF && initials && applicantsReady && extractedEPs.length) {
       submitBtn.disabled = false;
     }
+  }
+
+  function getApplicantForEp(ep) {
+    const group = applicantGroups.find(g => g.eps.includes(ep));
+    return group ? group.applicant : null;
   }
 
   function setupDropZone(dropZoneId, inputId) {
@@ -136,23 +141,46 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function formatApplicantHtml(applicant) {
+    const { address = {}, name, isNaturalPerson, naturalPersonDetails, email } = applicant;
+    let html = `<strong>Name:</strong> ${name || ''}<br>
+                <strong>Type:</strong> ${isNaturalPerson ? 'Natural Person' : 'Legal Entity'}<br>
+                <strong>Address:</strong><br>
+                ${address.address || ''}<br>
+                ${address.city || ''} ${address.zipCode || ''}<br>
+                ${address.state || ''}`;
+    if (email) {
+      html += `<br><strong>Email:</strong> ${email}`;
+    }
+    if (isNaturalPerson && naturalPersonDetails) {
+      html += `<br><strong>First Name:</strong> ${naturalPersonDetails.firstName || ''}<br>
+               <strong>Last Name:</strong> ${naturalPersonDetails.lastName || ''}`;
+    }
+    return html;
+  }
+
   function updateApplicantDisplay() {
     try {
-      const { address = {}, name, isNaturalPerson, naturalPersonDetails } = applicantInfo;
-      let html = `<strong>Name:</strong> ${name || ''}<br>
-                  <strong>Type:</strong> ${isNaturalPerson ? 'Natural Person' : 'Legal Entity'}<br>
-                  <strong>Address:</strong><br>
-                  ${address.address || ''}<br>
-                  ${address.city || ''} ${address.zipCode || ''}<br>
-                  ${address.state || ''}`;
-      if (applicantInfo.email) {
-        html += `<br><strong>Email:</strong> ${applicantInfo.email}`;
+      if (!applicantSummary) return;
+      if (!applicantGroups.length) {
+        applicantSummary.innerHTML = '';
+        return;
       }
-      if (isNaturalPerson && naturalPersonDetails) {
-        html += `<br><strong>First Name:</strong> ${naturalPersonDetails.firstName || ''}<br>
-                 <strong>Last Name:</strong> ${naturalPersonDetails.lastName || ''}`;
-      }
-      if (applicantSummary) applicantSummary.innerHTML = html;
+      const single = applicantGroups.length === 1;
+      applicantSummary.innerHTML = applicantGroups.map((group, i) => {
+        const count = group.eps.length;
+        const title = single ? 'All cases' : `Applicant ${i + 1}`;
+        return `
+          <div class="applicant-group">
+            <div class="applicant-group-header">
+              <strong>${title}</strong>
+              <span class="applicant-group-count">${count} case${count === 1 ? '' : 's'}</span>
+              <button type="button" class="edit-group-btn" data-group="${i}">Edit</button>
+            </div>
+            <div class="applicant-group-eps">${group.eps.map(ep => `<span class="ep-chip">${ep}</span>`).join('')}</div>
+            <div class="applicant-group-details">${formatApplicantHtml(group.applicant)}</div>
+          </div>`;
+      }).join('');
     } catch (err) {
       console.error('Failed to update applicant display', err);
     }
@@ -170,20 +198,21 @@ document.addEventListener('DOMContentLoaded', () => {
     wrapper.style.gap = '1rem';
 
     extractedEPs.forEach(ep => {
+      const applicant = getApplicantForEp(ep) || {};
       const payload = {
         statusPersonLodgingApplication: status,
         internalReference: ep,
         applicant: {
-          isNaturalPerson: applicantInfo.isNaturalPerson,
+          isNaturalPerson: applicant.isNaturalPerson,
           contactAddress: {
-            address: (applicantInfo.address?.address || ''),
-            zipCode: (applicantInfo.address?.zipCode || ''),
-            city:    (applicantInfo.address?.city || ''),
-            state:   (applicantInfo.address?.state || '')
+            address: (applicant.address?.address || ''),
+            zipCode: (applicant.address?.zipCode || ''),
+            city:    (applicant.address?.city || ''),
+            state:   (applicant.address?.state || '')
           },
 
-          ...(applicantInfo.isNaturalPerson ? { naturalPersonDetails: applicantInfo.naturalPersonDetails } : { legalEntityDetails: { name: applicantInfo.name } }),
-          ...(applicantInfo.email ? { email: applicantInfo.email } : {})
+          ...(applicant.isNaturalPerson ? { naturalPersonDetails: applicant.naturalPersonDetails } : { legalEntityDetails: { name: applicant.name } }),
+          ...(applicant.email ? { email: applicant.email } : {})
         },
         patent: { patentNumber: ep },
         documents: [{
@@ -222,6 +251,12 @@ document.addEventListener('DOMContentLoaded', () => {
       box.style.padding = '1rem';
       box.style.position = 'relative';
       box.style.background = '#f9f9f9';
+
+      const heading = document.createElement('div');
+      heading.style.fontWeight = 'bold';
+      heading.style.marginBottom = '0.5rem';
+      heading.textContent = `${ep} — ${applicant.name || 'No applicant found'}`;
+      box.appendChild(heading);
 
       const pre = document.createElement('pre');
       pre.textContent = JSON.stringify(payload, null, 2);
@@ -312,45 +347,73 @@ document.addEventListener('DOMContentLoaded', () => {
         const addrIndex = headers.findIndex(h => (h ?? '').toString().toLowerCase().includes('owner 1 address'));
         const emailIndex = headers.findIndex(h => (h ?? '').toString().toLowerCase().includes('owner 1 email'));
 
-      extractedEPs = rows.slice(headerRowIndex + 1)
-        .map(row => (row[epIndex] ?? '').toString().trim())
-        .filter(ep => ep.startsWith('EP'));
+      // Collect one case per row. Rows with blank owner cells inherit the
+      // details from the row above (merged-cell style spreadsheets).
+      const cases = [];
+      let lastOwner = null;
+      for (const row of rows.slice(headerRowIndex + 1)) {
+        const ep = (row[epIndex] ?? '').toString().trim();
+        if (!ep.startsWith('EP')) continue;
 
-      const name = rows[headerRowIndex + 1]?.[nameIndex]?.trim() || '';
-      const addressFull = rows[headerRowIndex + 1]?.[addrIndex]?.trim() || '';
-      const email = rows[headerRowIndex + 1]?.[emailIndex]?.trim() || '';
+        const name = (row[nameIndex] ?? '').toString().trim();
+        const addressFull = (row[addrIndex] ?? '').toString().trim();
+        const email = (row[emailIndex] ?? '').toString().trim();
 
+        let owner;
+        if (name || addressFull) {
+          owner = { name, addressFull, email };
+          lastOwner = owner;
+        } else {
+          owner = lastOwner || { name: '', addressFull: '', email: '' };
+        }
+        cases.push({ ep, owner });
+      }
+
+      extractedEPs = cases.map(c => c.ep);
+
+      // Group cases with identical owner details so each unique owner is
+      // parsed once and shown as one card.
+      const groupsByKey = new Map();
+      for (const c of cases) {
+        const key = `${c.owner.name}||${c.owner.addressFull}||${c.owner.email}`.toLowerCase();
+        if (!groupsByKey.has(key)) groupsByKey.set(key, { owner: c.owner, eps: [] });
+        groupsByKey.get(key).eps.push(c.ep);
+      }
+
+      spinner.textContent = `🔄 Parsing ${groupsByKey.size} applicant address${groupsByKey.size === 1 ? '' : 'es'} via GPT...`;
       spinner.style.display = 'block';
 
       try {
-        const addrRes = await fetch(`${BACKEND_URL}/parse-address`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address: addressFull, name })
-        }).then(res => res.json());
+        applicantGroups = await Promise.all([...groupsByKey.values()].map(async ({ owner, eps }) => {
+          const addrRes = await fetch(`${BACKEND_URL}/parse-address`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: owner.addressFull, name: owner.name })
+          }).then(res => res.json());
 
-        const isNatural = !!addrRes.isNaturalPerson;
-        const naturalPersonDetails = isNatural ? (addrRes.naturalPersonDetails || null) : null;
-        const legalEntityDetails   = !isNatural ? (addrRes.legalEntityDetails || { name }) : null;
+          const isNatural = !!addrRes.isNaturalPerson;
+          const naturalPersonDetails = isNatural ? (addrRes.naturalPersonDetails || null) : null;
+          const legalEntityDetails   = !isNatural ? (addrRes.legalEntityDetails || { name: owner.name }) : null;
 
-        const addressData = {
-          address: addrRes.address || '',
-          city:    addrRes.city || '',
-          zipCode: addrRes.zipCode || '',
-          state:   addrRes.state || addrRes.country || ''
-        };
+          const addressData = {
+            address: addrRes.address || '',
+            city:    addrRes.city || '',
+            zipCode: addrRes.zipCode || '',
+            state:   addrRes.state || addrRes.country || ''
+          };
 
+          const applicant = {
+            isNaturalPerson: isNatural,
+            name: isNatural && naturalPersonDetails
+              ? `${naturalPersonDetails.firstName || ''} ${naturalPersonDetails.lastName || ''}`.trim()
+              : (legalEntityDetails?.name || owner.name || ''),
+            naturalPersonDetails: naturalPersonDetails || undefined,
+            email: owner.email || undefined,
+            address: addressData
+          };
 
-        applicantInfo = {
-          isNaturalPerson: isNatural,
-          name: isNatural && naturalPersonDetails
-            ? `${naturalPersonDetails.firstName || ''} ${naturalPersonDetails.lastName || ''}`.trim()
-            : (legalEntityDetails?.name || name || ''),
-          naturalPersonDetails: naturalPersonDetails || undefined,
-          email: email || undefined,
-          address: addressData
-        };
-
+          return { applicant, eps };
+        }));
 
         if (epList) {
           epList.innerHTML = `<p>Found ${extractedEPs.length} EP numbers:</p>
@@ -359,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       } catch (err) {
         console.error('API error:', err);
+        applicantGroups = [];
         alert('Failed to parse address or name');
       } finally {
         spinner.style.display = 'none';
@@ -487,7 +551,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Submission logic
   submitBtn?.addEventListener('click', async () => {
     const initials = document.getElementById('initials').value.trim();
-    if (!applicationPDF || !initials || !applicantInfo.name) {
+    const applicantsReady = applicantGroups.length > 0 && applicantGroups.every(g => g.applicant?.name);
+    if (!applicationPDF || !initials || !applicantsReady) {
       alert('Initials, applicant info and application PDF are required.');
       return;
     }
@@ -497,15 +562,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const mandator = getMandator();
 
     for (const ep of extractedEPs) {
+      const applicant = getApplicantForEp(ep);
+      if (!applicant) {
+        result.innerHTML += `<p><strong>${ep}</strong>: ❌ No applicant details found for this case</p>`;
+        continue;
+      }
+
       const formData = new FormData();
       formData.append('initials', initials);
       formData.append('ep_number', ep);
       formData.append('applicant', JSON.stringify({
-        isNaturalPerson: applicantInfo.isNaturalPerson,
-        contactAddress: applicantInfo.address,
-        ...(applicantInfo.email ? { email: applicantInfo.email } : {}),
-        naturalPersonDetails: applicantInfo.isNaturalPerson ? applicantInfo.naturalPersonDetails : undefined,
-        legalEntityDetails: !applicantInfo.isNaturalPerson ? { name: applicantInfo.name } : undefined
+        isNaturalPerson: applicant.isNaturalPerson,
+        contactAddress: applicant.address,
+        ...(applicant.email ? { email: applicant.email } : {}),
+        naturalPersonDetails: applicant.isNaturalPerson ? applicant.naturalPersonDetails : undefined,
+        legalEntityDetails: !applicant.isNaturalPerson ? { name: applicant.name } : undefined
       }));
 
       if (mandator) formData.append('mandator', JSON.stringify(mandator));
@@ -535,11 +606,11 @@ document.addEventListener('DOMContentLoaded', () => {
           statusPersonLodgingApplication: initials === 'YH' ? 'RegisteredRepresentativeBeforeTheUPC' : 'NotARegisteredRepresentativeBeforeTheUPC',
           internalReference: ep,
           applicant: {
-            isNaturalPerson: applicantInfo.isNaturalPerson,
-            contactAddress: applicantInfo.address,
-            ...(applicantInfo.email ? { email: applicantInfo.email } : {}),
-            naturalPersonDetails: applicantInfo.isNaturalPerson ? applicantInfo.naturalPersonDetails : undefined,
-            legalEntityDetails: !applicantInfo.isNaturalPerson ? { name: applicantInfo.name } : undefined
+            isNaturalPerson: applicant.isNaturalPerson,
+            contactAddress: applicant.address,
+            ...(applicant.email ? { email: applicant.email } : {}),
+            naturalPersonDetails: applicant.isNaturalPerson ? applicant.naturalPersonDetails : undefined,
+            legalEntityDetails: !applicant.isNaturalPerson ? { name: applicant.name } : undefined
           },
 
           patent: { patentNumber: ep },
@@ -642,11 +713,11 @@ document.addEventListener('DOMContentLoaded', () => {
         initials,
         ep_number: ep,
         applicant: {
-          isNaturalPerson: applicantInfo.isNaturalPerson,
-          contactAddress: applicantInfo.address,
-          email: applicantInfo.email,
-          naturalPersonDetails: applicantInfo.isNaturalPerson ? applicantInfo.naturalPersonDetails : undefined,
-          legalEntityDetails: !applicantInfo.isNaturalPerson ? { name: applicantInfo.name } : undefined
+          isNaturalPerson: applicant.isNaturalPerson,
+          contactAddress: applicant.address,
+          email: applicant.email,
+          naturalPersonDetails: applicant.isNaturalPerson ? applicant.naturalPersonDetails : undefined,
+          legalEntityDetails: !applicant.isNaturalPerson ? { name: applicant.name } : undefined
         },
         mandator: mandator || undefined
       };
@@ -660,93 +731,105 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 
-  // Edit/Save applicant UI
-  if (editBtn && saveBtn && editForm) {
-    let originalInfo = null;
-    editBtn.addEventListener('click', () => {
-      if (editBtn.textContent === 'Edit') {
-        originalInfo = JSON.parse(JSON.stringify(applicantInfo));
-        editForm.style.display = 'block';
-        editBtn.textContent = 'Cancel';
-        const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = val || ''; };
-        set('edit-name', applicantInfo.name);
-        set('edit-address', applicantInfo.address?.address);
-        set('edit-city', applicantInfo.address?.city);
-        set('edit-zip', applicantInfo.address?.zipCode);
-        set('edit-state', applicantInfo.address?.state);
-        set('edit-email', applicantInfo.email);
-        // Prefill Applicant Type (if the dropdown exists) and toggle the name split fields
-        const typeSel = document.getElementById('edit-applicant-type');
-        if (typeSel) typeSel.value = String(!!applicantInfo.isNaturalPerson);
+  // Edit/Save applicant UI — the shared edit form edits one group at a time
+  let editingGroupIndex = null;
 
-        const split = document.getElementById('name-split-fields');
-        if (split) split.style.display = applicantInfo.isNaturalPerson ? 'block' : 'none';
-
-        if (applicantInfo.isNaturalPerson) {
-          document.getElementById('name-split-fields').style.display = 'block';
-          set('edit-first', applicantInfo.naturalPersonDetails?.firstName);
-          set('edit-last', applicantInfo.naturalPersonDetails?.lastName);
-        } else {
-          document.getElementById('name-split-fields').style.display = 'none';
-        }
-      } else {
-        applicantInfo = originalInfo;
-        updateApplicantDisplay();
-        updatePreview();
-        editForm.style.display = 'none';
-        editBtn.textContent = 'Edit';
-      }
-    });
-
-    document.getElementById('edit-applicant-type')?.addEventListener('change', (e) => {
-      const split = document.getElementById('name-split-fields');
-      if (split) split.style.display = (e.target.value === 'true') ? 'block' : 'none';
-    });
-
-
-    saveBtn.addEventListener('click', () => {
-      const get = id => document.getElementById(id)?.value?.trim() || '';
-      applicantInfo.name = get('edit-name');
-      applicantInfo.address = {
-        address: get('edit-address'),
-        city: get('edit-city'),
-        zipCode: get('edit-zip'),
-        state: get('edit-state')
-      };
-      applicantInfo.email = get('edit-email');
-      // Save Applicant Type from the edit dropdown if present
-      const isNat = document.getElementById('edit-applicant-type')
-        ? (document.getElementById('edit-applicant-type').value === 'true')
-        : applicantInfo.isNaturalPerson; // fallback if dropdown not present
-
-      applicantInfo.isNaturalPerson = isNat;
-
-      if (isNat) {
-        applicantInfo.naturalPersonDetails = {
-          firstName: get('edit-first'),
-          lastName:  get('edit-last')
-        };
-        // Keep display name in sync for natural persons
-        const fn = applicantInfo.naturalPersonDetails.firstName;
-        const ln = applicantInfo.naturalPersonDetails.lastName;
-        const full = `${fn || ''} ${ln || ''}`.trim();
-        if (full) applicantInfo.name = full;
-      } else {
-        delete applicantInfo.naturalPersonDetails;
-      }
-
-      if (applicantInfo.isNaturalPerson) {
-        applicantInfo.naturalPersonDetails = {
-          firstName: get('edit-first'),
-          lastName: get('edit-last')
-        };
-      }
-      updateApplicantDisplay();
-      updatePreview();
-      editForm.style.display = 'none';
-      editBtn.textContent = 'Edit';
-    });
+  function closeEditForm() {
+    editingGroupIndex = null;
+    if (editForm) editForm.style.display = 'none';
   }
+
+  function openEditForm(index) {
+    const applicant = applicantGroups[index]?.applicant;
+    if (!applicant || !editForm) return;
+
+    editingGroupIndex = index;
+
+    const title = document.getElementById('edit-form-title');
+    if (title) {
+      const eps = applicantGroups[index].eps;
+      title.textContent = applicantGroups.length === 1
+        ? 'Editing applicant (all cases)'
+        : `Editing Applicant ${index + 1} (${eps.join(', ')})`;
+    }
+
+    const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = val || ''; };
+    set('edit-name', applicant.name);
+    set('edit-address', applicant.address?.address);
+    set('edit-city', applicant.address?.city);
+    set('edit-zip', applicant.address?.zipCode);
+    set('edit-state', applicant.address?.state);
+    set('edit-email', applicant.email);
+
+    const typeSel = document.getElementById('edit-applicant-type');
+    if (typeSel) typeSel.value = String(!!applicant.isNaturalPerson);
+
+    const split = document.getElementById('name-split-fields');
+    if (split) split.style.display = applicant.isNaturalPerson ? 'block' : 'none';
+    if (applicant.isNaturalPerson) {
+      set('edit-first', applicant.naturalPersonDetails?.firstName);
+      set('edit-last', applicant.naturalPersonDetails?.lastName);
+    }
+
+    editForm.style.display = 'block';
+  }
+
+  applicantSummary?.addEventListener('click', e => {
+    const btn = e.target.closest('.edit-group-btn');
+    if (!btn) return;
+    const index = Number(btn.dataset.group);
+    if (editingGroupIndex === index && editForm?.style.display === 'block') {
+      closeEditForm();
+    } else {
+      openEditForm(index);
+    }
+  });
+
+  document.getElementById('cancel-applicant')?.addEventListener('click', closeEditForm);
+
+  document.getElementById('edit-applicant-type')?.addEventListener('change', (e) => {
+    const split = document.getElementById('name-split-fields');
+    if (split) split.style.display = (e.target.value === 'true') ? 'block' : 'none';
+  });
+
+  saveBtn?.addEventListener('click', () => {
+    const group = applicantGroups[editingGroupIndex];
+    if (!group) { closeEditForm(); return; }
+    const applicant = group.applicant;
+
+    const get = id => document.getElementById(id)?.value?.trim() || '';
+    applicant.name = get('edit-name');
+    applicant.address = {
+      address: get('edit-address'),
+      city: get('edit-city'),
+      zipCode: get('edit-zip'),
+      state: get('edit-state')
+    };
+    applicant.email = get('edit-email');
+
+    const isNat = document.getElementById('edit-applicant-type')
+      ? (document.getElementById('edit-applicant-type').value === 'true')
+      : applicant.isNaturalPerson;
+
+    applicant.isNaturalPerson = isNat;
+
+    if (isNat) {
+      applicant.naturalPersonDetails = {
+        firstName: get('edit-first'),
+        lastName:  get('edit-last')
+      };
+      // Keep display name in sync for natural persons
+      const full = `${applicant.naturalPersonDetails.firstName || ''} ${applicant.naturalPersonDetails.lastName || ''}`.trim();
+      if (full) applicant.name = full;
+    } else {
+      delete applicant.naturalPersonDetails;
+    }
+
+    updateApplicantDisplay();
+    updatePreview();
+    enableSubmitIfReady();
+    closeEditForm();
+  });
 
   if (copyRequestJsonButton) {
     const copyIcon = copyRequestJsonButton.querySelector('.copy-icon');

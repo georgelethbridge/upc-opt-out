@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const appPdfBase64Display = document.getElementById('app-pdf-base64');
   const mandatePdfBase64Display = document.getElementById('mandate-pdf-base64');
   const requestBodyDisplay = document.getElementById('request-json');
+  let allPayloads = [];
   const copyRequestJsonButton = document.getElementById('copy-request-json');
   const saveBtn = document.getElementById('save-applicant');
   const editForm = document.getElementById('applicant-edit-form');
@@ -186,16 +187,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Display-only: shorten base64 attachment data so cards stay readable.
+  // Copy buttons always use the full, unabbreviated payload.
+  function abbreviateBase64(key, value) {
+    if (key === 'data' && typeof value === 'string' && value.length > 40) {
+      const kb = Math.round((value.length * 3) / 4 / 1024);
+      return `${value.slice(0, 16)}… [base64, ~${kb} KB]`;
+    }
+    return value;
+  }
+
   function updatePreview() {
     const initials = document.getElementById('initials').value.trim();
     const status = initials === 'YH' ? 'RegisteredRepresentativeBeforeTheUPC' : 'NotARegisteredRepresentativeBeforeTheUPC';
 
     requestBodyDisplay.innerHTML = '';
 
+    allPayloads = [];
+
     const wrapper = document.createElement('div');
-    wrapper.style.display = 'grid';
-    wrapper.style.gridTemplateColumns = 'repeat(auto-fit, minmax(300px, 1fr))';
-    wrapper.style.gap = '1rem';
+    wrapper.className = 'json-grid';
 
     extractedEPs.forEach(ep => {
       const applicant = getApplicantForEp(ep) || {};
@@ -246,32 +257,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
+      allPayloads.push(payload);
+
       const box = document.createElement('div');
-      box.style.border = '1px solid #ccc';
-      box.style.padding = '1rem';
-      box.style.position = 'relative';
-      box.style.background = '#f9f9f9';
+      box.className = 'json-card';
 
-      const heading = document.createElement('div');
-      heading.style.fontWeight = 'bold';
-      heading.style.marginBottom = '0.5rem';
-      heading.textContent = `${ep} — ${applicant.name || 'No applicant found'}`;
-      box.appendChild(heading);
+      const header = document.createElement('div');
+      header.className = 'json-card-header';
 
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(payload, null, 2);
+      const title = document.createElement('div');
+      title.className = 'json-card-title';
+      const epEl = document.createElement('span');
+      epEl.className = 'json-card-ep';
+      epEl.textContent = ep;
+      const nameEl = document.createElement('span');
+      nameEl.className = 'json-card-name';
+      nameEl.textContent = applicant.name || 'No applicant found';
+      title.append(epEl, nameEl);
+
+      const fullJson = JSON.stringify(payload, null, 2);
 
       const copyBtn = document.createElement('button');
+      copyBtn.className = 'json-card-copy';
+      copyBtn.title = 'Copy full JSON';
       copyBtn.innerHTML = '<img src="copy-icon.svg" alt="Copy" width="16" height="16">';
-      copyBtn.style.position = 'absolute';
-      copyBtn.style.top = '0.5rem';
-      copyBtn.style.right = '0.5rem';
-      copyBtn.style.background = 'transparent';
-      copyBtn.style.border = 'none';
-      copyBtn.style.cursor = 'pointer';
-
       copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(pre.textContent).then(() => {
+        navigator.clipboard.writeText(fullJson).then(() => {
           copyBtn.innerHTML = '<img src="check-icon.svg" alt="Copied" width="16" height="16">';
           setTimeout(() => {
             copyBtn.innerHTML = '<img src="copy-icon.svg" alt="Copy" width="16" height="16">';
@@ -279,8 +290,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
 
-      box.appendChild(copyBtn);
-      box.appendChild(pre);
+      header.append(title, copyBtn);
+
+      const pre = document.createElement('pre');
+      pre.className = 'json-card-body';
+      pre.textContent = JSON.stringify(payload, abbreviateBase64, 2);
+
+      box.append(header, pre);
       wrapper.appendChild(box);
     });
 
@@ -835,8 +851,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyIcon = copyRequestJsonButton.querySelector('.copy-icon');
     const successIcon = copyRequestJsonButton.querySelector('.success-icon');
     copyRequestJsonButton.addEventListener('click', () => {
-      if (requestBodyDisplay.textContent) {
-        navigator.clipboard.writeText(requestBodyDisplay.textContent).then(() => {
+      if (allPayloads.length) {
+        const text = JSON.stringify(allPayloads.length === 1 ? allPayloads[0] : allPayloads, null, 2);
+        navigator.clipboard.writeText(text).then(() => {
           copyIcon.style.display = 'none';
           successIcon.style.display = 'inline-block';
           setTimeout(() => {

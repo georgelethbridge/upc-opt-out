@@ -219,27 +219,86 @@ textarea:focus {
 /* Request JSON Block */
 #request-json {
   margin: 0;
-  padding: 2.5rem 1rem 1rem;
-  background: #f9f9f9;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  white-space: pre-wrap;
+  padding: 2.75rem 1rem 1rem;
+  background: #f1f3f8;
+  border: 1px solid #dde1ea;
+  border-radius: 8px;
+}
+
+.json-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
 }
 
 /* Each JSON card */
-#request-json > div {
-  background: white;
+.json-card {
+  min-width: 0; /* let grid items shrink instead of overflowing */
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #dde1ea;
   border-radius: 8px;
-  padding: 1rem;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
-  position: relative;
-  overflow-x: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
 }
 
-#request-json pre {
+.json-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: #f8f9fc;
+  border-bottom: 1px solid #e6e9f0;
+}
+
+.json-card-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.json-card-ep {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
   font-size: 0.9rem;
-  line-height: 1.4;
-  font-family: monospace;
+}
+
+.json-card-name {
+  font-size: 0.8rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.json-card-copy {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.35rem;
+  line-height: 0;
+  opacity: 0.7;
+}
+
+.json-card-copy:hover {
+  background: #eef1f6;
+  border-color: #dde1ea;
+  opacity: 1;
+}
+
+.json-card-body {
+  margin: 0;
+  padding: 0.75rem;
+  max-height: 420px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Buttons */
